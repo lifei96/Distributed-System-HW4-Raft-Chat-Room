@@ -11,6 +11,23 @@
 #include <QDateTime>
 #include <QtAlgorithms>
 
+// leader election, message passing, and failure recovery
+
+// election timeout: The election timeout is the amount of time a follower waits until becoming a candidate.
+// randomized to be between 150ms and 300ms. after timeout, vote itself and Request Vote messages to other nodes.
+// and the node resets its election timeout.Once a candidate has a majority of votes it becomes leader.
+
+// An entry is committed once a majority of followers acknowledge it
+
+enum NodeState {
+    int follower=0;
+    int candidate;
+    int leader;
+}
+class Entry: public{
+    QString cmd;
+    quint16 term;
+}
 class NetSocket : public QUdpSocket {
     Q_OBJECT
 
@@ -25,38 +42,6 @@ public:
     quint16 port;
 };
 
-class ResponseTime {
-public:
-    ResponseTime() : portNum(0), sendTime(0), recvTime(0) {}
-
-    ResponseTime(quint16 _portNum, qint64 _sendTime, qint64 _recvTime)
-            : portNum(_portNum), sendTime(_sendTime), recvTime(_recvTime) {}
-
-    void setSendTime(qint64 _sendTime) {
-        sendTime = _sendTime;
-    }
-
-    void setRecvTime(qint64 _recvTime) {
-        recvTime = _recvTime;
-    }
-
-    qint64 getResponseTime() const {
-        return sendTime <= recvTime ? (recvTime - sendTime) : sendTime;
-    }
-
-    quint16 getPortNum() {
-        return portNum;
-    }
-
-    bool operator<(const ResponseTime &rhs) const {
-        return getResponseTime() < rhs.getResponseTime();
-    }
-
-private:
-    quint16 portNum;
-    qint64 sendTime, recvTime;
-};
-
 class ChatDialog : public QDialog {
     Q_OBJECT
 
@@ -64,60 +49,35 @@ public:
     ChatDialog();
 
 private:
-    void initResponseTime(quint16 portMin, quint16 portMax);
-
-    quint16 findPort();
-
-    void serializeMessage(
-            QVariantMap message, QHostAddress destHost, quint16 destPort);
-
-    void deserializeMessage(
-            QByteArray datagram, QHostAddress senderHost, quint16 senderPort);
-
-    void receiveRumorMessage(
-            QVariantMap message, QHostAddress senderHost, quint16 senderPort);
-
-    void receiveStatusMessage(
-            QVariantMap message, QHostAddress senderHost, quint16 senderPort);
-
-    void sendRumorMessage(
-            QString origin,
-            quint32 seqno,
-            QHostAddress destHost,
-            quint16 destPort);
-
-    void sendStatusMessage(QHostAddress destHost, quint16 destPort);
-
-    void rumor();
-
-    QVariantMap buildRumorMessage(
-            QString origin, quint32 seqno, QString charText);
-
-    QVariantMap buildStatusMessage();
+    
 
 public slots:
     void gotReturnPressed();
 
     void receiveDatagrams();
 
-    void rumorTimeout();
+    void voteSelf();
 
-    void antiEntropyTimeout();
+    void voteSelf();
 
 private:
     QTextEdit *textview;
     QLineEdit *textline;
     NetSocket *socket;
-    QTimer *rumorTimer;
-    QTimer *antiEntropyTimer;
     QString originName;
     quint16 portNum;
-    QMap <QString, QStringList> messageDict;
-    QString lastReceivedOrigin;
-    quint32 lastReceivedSeqno;
-    QMap <quint16, ResponseTime> responseTimeDict;
-    static const int ANTI_ENTROPY_TIMEOUT = 4000;
-    static const int RUMOR_TIMEOUT = 1000;
+    quint16 currentTerm;
+    quint16 votedFor;
+    Entry log[LOG_LIMITATION];
+    quint16 commitIndex;
+    quint16 lastApplied;
+    quint16 nextIndex[5];
+    quint16 matchIndex[5];
+    QTimer *electionTimer;
+    QTimer *heartbeatTimer;
+    quint16 allNodes[5];
+    NodeState state;
+    static const int LOG_LIMITATION = 101;
 };
 
 #endif // P2PAPP_MAIN_HH
