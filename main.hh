@@ -19,9 +19,11 @@
 
 // An entry is committed once a majority of followers acknowledge it
 
+// A datagram have the following two fields.
 const string DATAGRAM_TYPE = "DATAGRAM_TYPE";
 const string DATAGRAM_CONTENT = "DATAGRAM_CONTENT";
 
+// Values for DATAGRAM_TYPE.
 enum DatagramType {
     int elect = 0;
     int vote;
