@@ -19,12 +19,12 @@
 
 // An entry is committed once a majority of followers acknowledge it
 
-// A datagram have the following two fields.
-const string DATAGRAM_TYPE = "DATAGRAM_TYPE";
-const string DATAGRAM_CONTENT = "DATAGRAM_CONTENT";
+// A message have the following two fields.
+const string MESSAGE_TYPE = "MESSAGE_TYPE";
+const string MESSAGE_CONTENT = "MESSAGE_CONTENT";
 
-// Values for DATAGRAM_TYPE.
-enum DatagramType {
+// Values for MESSAGE_TYPE.
+enum MessageType {
     int elect = 0;
     int vote;
     int msg;
