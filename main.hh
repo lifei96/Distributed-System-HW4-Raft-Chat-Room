@@ -19,15 +19,26 @@
 
 // An entry is committed once a majority of followers acknowledge it
 
+const string DATAGRAM_TYPE = "DATAGRAM_TYPE";
+const string DATAGRAM_CONTENT = "DATAGRAM_CONTENT";
+
+enum DatagramType {
+    int elect = 0;
+    int vote;
+    int msg;
+};
+
 enum NodeState {
-    int follower=0;
+    int follower = 0;
     int candidate;
     int leader;
-}
+};
+
 class Entry: public{
     QString cmd;
     quint16 term;
-}
+};
+
 class NetSocket : public QUdpSocket {
     Q_OBJECT
 
