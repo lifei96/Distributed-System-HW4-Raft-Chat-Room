@@ -28,6 +28,7 @@ enum MessageType {
     int elect = 0;
     int vote;
     int msg;
+    int ack;
 };
 
 enum NodeState {
@@ -39,6 +40,11 @@ enum NodeState {
 class Entry: public{
     QString cmd;
     quint16 term;
+};
+
+class Response: public{
+    quint16 term;
+    bool status;
 };
 
 class NetSocket : public QUdpSocket {
@@ -80,7 +86,8 @@ private:
     QString originName;
     quint16 portNum;
     quint16 currentTerm;
-    quint16 votedFor;
+    quint16 currentLeader;
+    qint16 votedFor;
     Entry log[LOG_LIMITATION];
     quint16 commitIndex;
     quint16 lastApplied;

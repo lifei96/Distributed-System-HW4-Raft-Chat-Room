@@ -53,7 +53,7 @@ ChatDialog::ChatDialog() {
     connect(socket, SIGNAL(readyRead()),
             this, SLOT(receiveDatagrams()));
     connect(electionTimer, SIGNAL(timeout()),
-            this, SLOT(voteSelf()));
+            this, SLOT(becomeCandidate()));
     connect(heartbeatTimer, SIGNAL(timeout()),
             this, SLOT(()));
     
@@ -90,24 +90,42 @@ void ChatDialog::gotReturnPressed() {
 
 void ChatDialog::getStart() {
     state = NodeState.follower;
+    currentTerm = 0;
+    votedFor = -1;
+    commitIndex = 0;
+    lastApplied = 0;
+    
+}
+void ChatDialog::becomeCandidate() {
+    currentTerm += 1;
+    // for (int i = myPortMin; i <= myPortMax; i++) {
+    //     vote_for_me(i);
+    // }
+    currentLeader = -1;
+    state = NodeState.candidate;
     quint16 randomTimeout= qrand() % 150 + 150;
     electionTimer->start(randomTimeout);
-}
-void ChatDialog::voteSelf() {
-    self.state = NodeState.candidate;
-    requestVote();
+    for (int i = myPortMin; i <= myPortMax; i++) {
+        if (i != portNum && node_is_active(i) && node_is_voting(i)) {
+            snedRequestVote(portNum, currentTerm, portNum, commitIndex, log[commitIndex].term);
+        }
+    }
 }
 
+void ChatDialog::becomeLeader() {
+    state = NodeState.leader;
+
+}
 void ChatDialog::requestVote(quint16 term, quint16 candidateId, quint16 lastLogIndex, quint16 lastLogTerm) {
     if (term < currentTerm) {
-        return currentTerm, false;
+        return Response(currentTerm, false);
     }
     if ((votedFor == -1 || votedFor == candidateId) && log[lastLogIndex] == lastLogTerm) {
-        return currentTerm, true;
+        return Response(currentTerm, true);
     }
 }
 
-void ChatDialog::appendEntries(quint16 term, quint16 leaderId, quint16 prevLogIndex, quint16 prevLogTerm,
+Response ChatDialog::appendEntries(quint16 term, quint16 leaderId, quint16 prevLogIndex, quint16 prevLogTerm,
                                 Entry *entries, quint16 leaderCommit) {
     if (term < currentTerm) {
         return currentTerm, false;
@@ -123,7 +141,7 @@ void ChatDialog::appendEntries(quint16 term, quint16 leaderId, quint16 prevLogIn
     if (leaderCommit > commitIndex) {
         commitIndex = min(leaderCommit, prevLogIndex + i + 1);
     }
-    return term, success;
+    return Response(term, true);
 
 }
 void ChatDialog::receiveDatagrams() {
@@ -145,8 +163,7 @@ void ChatDialog::receiveDatagrams() {
 
 void ChatDialog::serializeMessage(
         QVariantMap message, QHostAddress destHost, quint16 destPort) {
-    // To serialize a message you’ll need to construct a QVariantMap describing
-    // the message
+
     qDebug() << "serialize Message";
     QByteArray datagram;
     QDataStream outStream(&datagram, QIODevice::ReadWrite);
@@ -174,15 +191,7 @@ void ChatDialog::serializeMessage(
 
 void ChatDialog::deserializeMessage(
         QByteArray datagram, QHostAddress senderHost, quint16 senderPort) {
-    // using QDataStream, and handle the message as appropriate
-    // containing a ChatText key with a value of type QString
-    qint64 curTime = QDateTime::currentMSecsSinceEpoch();
-    if (responseTimeDict.contains(senderPort)) {
-        responseTimeDict[senderPort].setRecvTime(curTime);
-    } else {
-        responseTimeDict.insert(senderPort,
-                                ResponseTime(senderPort, curTime, curTime));
-    }
+
     qDebug() << "deserialize Message";
     QVariantMap message;
     QDataStream inStream(&datagram, QIODevice::ReadOnly);
