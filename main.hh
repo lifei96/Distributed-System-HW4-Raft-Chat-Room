@@ -26,7 +26,7 @@ const string MESSAGE_CONTENT = "MESSAGE_CONTENT";
 // Values for MESSAGE_TYPE.
 enum MessageType {
     int elect = 0;
-    int vote;
+    int request;
     int msg;
     int ack;
 };
@@ -35,11 +35,13 @@ enum NodeState {
     int follower = 0;
     int candidate;
     int leader;
+    int stop;
 };
 
 class Entry: public{
-    QString cmd;
     quint16 term;
+    QString cmd;
+    quint16 node_id;
 };
 
 class Response: public{
@@ -86,18 +88,22 @@ private:
     quint16 portNum;
     quint16 currentTerm;
     quint16 currentLeader;
+    qint16 voteflag;
     qint16 votedFor;
     Entry log[LOG_LIMITATION];
     Entry cachedLog[LOG_LIMITATION];
     quint16 commitIndex;
     quint16 lastApplied;
+    /*  record state for all nodes: 0 close 1 follower 2 candidate 3 leader     */
+    quint16 allNodes[5];
     quint16 nextIndex[5];
     quint16 matchIndex[5];
+    bool dropIndex[5];
     QTimer *electionTimer;
     QTimer *heartbeatTimer;
-    quint16 allNodes[5];
     NodeState state;
     static const int LOG_LIMITATION = 101;
+    static const int HEARTBEATS = 50;
 };
 
 #endif // P2PAPP_MAIN_HH
