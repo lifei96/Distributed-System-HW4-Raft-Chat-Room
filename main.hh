@@ -11,40 +11,38 @@
 #include <QDateTime>
 #include <QtAlgorithms>
 
-// leader election, message passing, and failure recovery
-
-// election timeout: The election timeout is the amount of time a follower waits until becoming a candidate.
-// randomized to be between 150ms and 300ms. after timeout, vote itself and Request Vote messages to other nodes.
-// and the node resets its election timeout.Once a candidate has a majority of votes it becomes leader.
-
-// An entry is committed once a majority of followers acknowledge it
-
 // A message have the following two fields.
-const string MESSAGE_TYPE = "MESSAGE_TYPE";
-const string MESSAGE_CONTENT = "MESSAGE_CONTENT";
+// const string MESSAGE_TYPE = "MESSAGE_TYPE";
+// const string MESSAGE_CONTENT = "MESSAGE_CONTENT";
 
 // Values for MESSAGE_TYPE.
 enum MessageType {
-    int elect = 0;
-    int request;
-    int msg;
-    int ack;
+    elect = 0,
+    request,
+    msg,
+    ack,
 };
 
 enum NodeState {
-    int follower = 0;
-    int candidate;
-    int leader;
-    int stop;
+    follower = 0,
+    candidate,
+    leader,
+    stop,
 };
 
-class Entry: public{
+class Entry {
+public:
+    Entry(){};
+    Entry(quint16 _term, QString _cmd, quint16 _node_id): term(_term), cmd(_cmd), node_id(_node_id){}
     quint16 term;
     QString cmd;
     quint16 node_id;
 };
 
-class Response: public{
+class Response {
+public:
+    Response(){};
+    Response(quint16 _term, bool _status): term(_term), status(_status){}
     quint16 term;
     bool status;
 };
@@ -70,21 +68,35 @@ public:
     ChatDialog();
 
 private:
-    
+    Response processCommand(QString cmd, quint16 node_id);
+    void getStart();
+    void becomeLeader();
+    Response requestVote(quint16 term, quint16 candidateId, quint16 lastLogIndex, quint16 lastLogTerm);
+    void redirectRequest(QString cmd);
+    void sendRequest(MessageType type, quint16 destPort, QVariantMap otherinfo);
+    Response appendEntries(quint16 term, quint16 leaderId, quint16 prevLogIndex, quint16 prevLogTerm,
+                                Entry *entries, quint16 leaderCommit);
+    void serializeMessage(QVariantMap message, quint16 destPort);
+    void deserializeMessage(QByteArray datagram, quint16 senderPort);
+
 
 public slots:
     void gotReturnPressed();
 
     void receiveDatagrams();
 
-    void voteSelf();
+    void becomeCandidate();
 
-    void voteSelf();
+    void sendHeartbeat();
 
 private:
+    static const int LOG_LIMITATION = 101;
+    static const int HEARTBEATS = 1000;
+    static const int ELECTION_TIME = 3000;
     QTextEdit *textview;
     QLineEdit *textline;
     NetSocket *socket;
+    quint16 myPortMin, myPortMax;
     quint16 portNum;
     quint16 currentTerm;
     quint16 currentLeader;
@@ -102,8 +114,6 @@ private:
     QTimer *electionTimer;
     QTimer *heartbeatTimer;
     NodeState state;
-    static const int LOG_LIMITATION = 101;
-    static const int HEARTBEATS = 50;
 };
 
 #endif // P2PAPP_MAIN_HH
