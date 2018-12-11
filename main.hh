@@ -83,12 +83,12 @@ private:
     QTextEdit *textview;
     QLineEdit *textline;
     NetSocket *socket;
-    QString originName;
     quint16 portNum;
     quint16 currentTerm;
     quint16 currentLeader;
     qint16 votedFor;
     Entry log[LOG_LIMITATION];
+    Entry cachedLog[LOG_LIMITATION];
     quint16 commitIndex;
     quint16 lastApplied;
     quint16 nextIndex[5];
