@@ -69,25 +69,23 @@ public:
 
 private:
     void startElectionTimer();
-    Response processCommand(QString cmd, quint16 node_id);
+    void processCommand(Entry entry, bool redirect);
     void getStart();
+    void becomeFollower();
     void becomeLeader();
     Response requestVote(quint16 term, quint16 candidateId, quint16 lastLogIndex, quint16 lastLogTerm);
-    void redirectRequest(QString cmd);
+    void redirectRequest();
     void sendRequest(MessageType type, quint16 destPort, QVariantMap otherinfo);
     Response appendEntries(quint16 term, quint16 leaderId, quint16 prevLogIndex, quint16 prevLogTerm,
-                                Entry *entries, quint16 leaderCommit);
+                                Entry *entries, quint16 leaderCommit, quint16 size);
     void serializeMessage(QVariantMap message, quint16 destPort);
     void deserializeMessage(QByteArray datagram, quint16 senderPort);
 
 
 public slots:
     void gotReturnPressed();
-
     void receiveDatagrams();
-
     void becomeCandidate();
-
     void sendHeartbeat();
 
 private:
@@ -100,16 +98,22 @@ private:
     quint16 myPortMin, myPortMax;
     quint16 portNum;
     quint16 currentTerm;
-    quint16 currentLeader;
+    qint16 currentLeader;
     qint16 voteflag;
     qint16 votedFor;
     Entry log[LOG_LIMITATION];
     QVector<Entry>cachedLog;
+    /* record index of commands this server has commited    */
     quint16 commitIndex;
+    /* record index of commands this server has received    */
+    quint16 receiveIndex;
+    /* record index of commands this server has appliyed    */
     quint16 lastApplied;
-    /*  record state for all nodes: 0 close 1 follower 2 candidate 3 leader     */
+    /* record state for all nodes: 0 close 1 follower 2 candidate 3 leader      */
     quint16 allNodes[5];
+    /* record the replication in each node      */
     quint16 nextIndex[5];
+    /* record the commited index in each node   */
     quint16 matchIndex[5];
     bool dropIndex[5];
     QTimer *electionTimer;
