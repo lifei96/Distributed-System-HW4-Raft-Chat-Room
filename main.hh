@@ -68,6 +68,7 @@ public:
     ChatDialog();
 
 private:
+    quint16 getid(quint16 port);
     void startElectionTimer();
     void processCommand(Entry entry, bool redirect);
     void getStart();

@@ -59,6 +59,10 @@ ChatDialog::ChatDialog() {
     getStart();
 }
 
+quint16 ChatDialog::getid(quint16 port) {
+    return port - myPortMin;
+}
+
 void ChatDialog::processCommand(Entry entry, bool redirect) {
     QString cmd = entry.cmd;
     qDebug() << "Process command:" << cmd;
@@ -68,7 +72,7 @@ void ChatDialog::processCommand(Entry entry, bool redirect) {
     } else if (cmd.startsWith("STOP")) {
         state = stop;
         currentLeader = -1;
-        allNodes[portNum - myPortMin] = 0;
+        allNodes[getid(portNum)] = 0;
         textview->append("STOP");
         electionTimer->stop();
     } else if (cmd.startsWith("GET_CHAT")) {
@@ -81,7 +85,7 @@ void ChatDialog::processCommand(Entry entry, bool redirect) {
         int index = cmd.mid(5).toInt();
         if (index >= myPortMin && index <= myPortMax) {
             qDebug() << "DROP" << index;
-            dropIndex[index - myPortMin] = true;
+            dropIndex[getid(index)] = true;
         } else {
             qDebug() << "invalid node_id";
         }
@@ -89,13 +93,13 @@ void ChatDialog::processCommand(Entry entry, bool redirect) {
         int index = cmd.mid(8).toInt();
         if (index >= myPortMin && index <= myPortMax) {
             qDebug() << "RESTORE" << index;
-            dropIndex[index - myPortMin] = false;
+            dropIndex[getid(index)] = false;
         } else {
             qDebug() << "invalid node_id";
         }
     } else if (cmd.startsWith("GET_NODES")) {
         for (int p = myPortMin; p <= myPortMax; p++) {
-            switch(allNodes[p - myPortMin]) {
+            switch(allNodes[getid(p)]) {
                 case 0:
                     qDebug() << p << ": stop";
                     break;
@@ -164,11 +168,11 @@ void ChatDialog::getStart() {
     receiveIndex = 0;
     textview->clear();
     for (int p = myPortMin; p <= myPortMax; p++) {
-        allNodes[p - myPortMin] = 1;
+        allNodes[getid(p)] = 1;
         /* Set true if drop from this node  */
-        dropIndex[p - myPortMin] = false;
-        nextIndex[p - myPortMin] = 1;
-        matchIndex[p - myPortMin] = 0;
+        dropIndex[getid(p)] = false;
+        nextIndex[getid(p)] = 1;
+        matchIndex[getid(p)] = 0;
     }
     startElectionTimer();
 }
@@ -188,19 +192,19 @@ void ChatDialog::sendHeartbeat() {
 void ChatDialog::becomeFollower() {
     qDebug() << portNum << " become follower";
     state = follower;
-    allNodes[portNum - myPortMin] = 1;
+    allNodes[getid(portNum)] = 1;
 }
 
 void ChatDialog::becomeCandidate() {
     qDebug() << portNum << " become candidate";
     currentTerm += 1;
     currentLeader = -1;
-    voteflag = 1 << (portNum - myPortMin);
+    voteflag = 1 << (getid(portNum));
     state = candidate;
     for (int p = 0; p < 5; p++) {
         allNodes[p] = 1;
     }
-    allNodes[portNum - myPortMin] = 2;
+    allNodes[getid(portNum)] = 2;
     startElectionTimer();
     for (int p = myPortMin; p <= myPortMax; p++) {
         if (p != portNum) {
@@ -213,7 +217,7 @@ void ChatDialog::becomeLeader() {
     qDebug() << portNum << " become leader";
     currentLeader = portNum;
     state = leader;
-    allNodes[portNum - myPortMin] = 3;
+    allNodes[getid(portNum)] = 3;
     electionTimer->stop();
     sendHeartbeat();
 }
@@ -229,7 +233,7 @@ Response ChatDialog::requestVote(quint16 term, quint16 candidateId, quint16 last
         for (int p = 0; p < 5; p++) {
             allNodes[p] = 1;
         }
-        allNodes[candidateId - myPortMin] = 2;
+        allNodes[getid(candidateId)] = 2;
         return Response(currentTerm, true);
     }
     if ((votedFor == -1 || votedFor == candidateId) && log[lastLogIndex].term == lastLogTerm) {
@@ -237,7 +241,7 @@ Response ChatDialog::requestVote(quint16 term, quint16 candidateId, quint16 last
         for (int p = 0; p < 5; p++) {
             allNodes[p] = 1;
         }
-        allNodes[candidateId - myPortMin] = 2;
+        allNodes[getid(candidateId)] = 2;
         return Response(currentTerm, true);
     }
     return Response(currentTerm, false);
@@ -289,11 +293,11 @@ void ChatDialog::sendRequest(MessageType type, quint16 destPort, QVariantMap oth
                 break;
             }
             parameters["leaderId"] = portNum;
-            parameters["prevLogIndex"] = nextIndex[destPort - myPortMin] - 1;
-            parameters["prevLogTerm"] = log[nextIndex[destPort - myPortMin] - 1].term;
+            parameters["prevLogIndex"] = nextIndex[getid(destPort)] - 1;
+            parameters["prevLogTerm"] = log[nextIndex[getid(destPort)] - 1].term;
             QVariantMap entries;
-            entries["size"] = int(receiveIndex - nextIndex[destPort - myPortMin] + 1);
-            for(int i = nextIndex[destPort - myPortMin]; i <= receiveIndex; i++) {
+            entries["size"] = int(receiveIndex - nextIndex[getid(destPort)] + 1);
+            for(int i = nextIndex[getid(destPort)]; i <= receiveIndex; i++) {
                 QVariantMap entry;
                 entry["term"] = log[i].term;
                 entry["cmd"] = log[i].cmd;
@@ -387,7 +391,7 @@ void ChatDialog::deserializeMessage(QByteArray datagram, quint16 senderPort) {
     QDataStream inStream(&datagram, QIODevice::ReadOnly);
     inStream >> message;
     quint16 term;
-    if (dropIndex[senderPort - myPortMin]) {
+    if (dropIndex[getid(senderPort)]) {
         qDebug() << "Drop message from" << senderPort;
         return;
     }
@@ -426,8 +430,8 @@ void ChatDialog::deserializeMessage(QByteArray datagram, quint16 senderPort) {
         term = parameters["term"].toUInt();
 
         log[++receiveIndex] = newEntry;
-        matchIndex[portNum - myPortMin] = receiveIndex;
-        nextIndex[portNum - myPortMin] = receiveIndex + 1;
+        matchIndex[getid(portNum)] = receiveIndex;
+        nextIndex[getid(portNum)] = receiveIndex + 1;
 
         QVariantMap otherinfo;
         otherinfo["cmd"] = newEntry.cmd;
@@ -446,7 +450,7 @@ void ChatDialog::deserializeMessage(QByteArray datagram, quint16 senderPort) {
             currentLeader = senderPort;
             for(int i = 0; i < 5; i++)
                 allNodes[i] = 1;
-            allNodes[senderPort - myPortMin] = 3;
+            allNodes[getid(senderPort)] = 3;
         }
         QVariantMap parameters = qvariant_cast<QVariantMap>(message["MSG"]);
         term = parameters["term"].toUInt();
@@ -495,22 +499,22 @@ void ChatDialog::deserializeMessage(QByteArray datagram, quint16 senderPort) {
             bool status = parameters["status"].toBool();
             qDebug() << "receiveIndex =" << received << " from " << senderPort;
             if (status) {
-                nextIndex[senderPort - myPortMin] = received + 1;
+                nextIndex[getid(senderPort)] = received + 1;
             } else {
                 // If AppendEntries fails because of log inconsistency: decrement nextIndex and retry
-                nextIndex[senderPort - myPortMin] --;
+                nextIndex[getid(senderPort)] --;
                 sendRequest(msg, senderPort, QVariantMap());
             }
-            matchIndex[senderPort - myPortMin] = qMax(matchIndex[senderPort - myPortMin], received);
+            matchIndex[getid(senderPort)] = qMax(matchIndex[getid(senderPort)], received);
             for (int p = myPortMin; p <= myPortMax; p++) {
                 int votes = 0;
                 for (int q = myPortMin; q <= myPortMax; q++) {
-                    if (matchIndex[q - myPortMin] >= matchIndex[p - myPortMin]) {
+                    if (matchIndex[getid(q)] >= matchIndex[getid(p)]) {
                         votes ++;
                     }
                 }
-                if (votes >= 3 && matchIndex[p - myPortMin] > commitIndex) {
-                    commitIndex = matchIndex[p - myPortMin];
+                if (votes >= 3 && matchIndex[getid(p)] > commitIndex) {
+                    commitIndex = matchIndex[getid(p)];
                     qDebug() << "myleaderCommit = " << commitIndex;
                     for (int i = lastApplied + 1; i <= commitIndex; i++) {
                         processCommand(log[i], false);
@@ -533,10 +537,10 @@ void ChatDialog::deserializeMessage(QByteArray datagram, quint16 senderPort) {
             quint16 vote_who = parameters["votedFor"].toUInt();
             qDebug() << "vote:" << vote_who;
             if (vote_who == portNum) {
-                voteflag |= 1 << (senderPort - myPortMin);
+                voteflag |= 1 << (getid(senderPort));
                 int votes = 0;
                 for (int p = myPortMin; p <= myPortMax; p++) {
-                    if (voteflag & (1 << (p - myPortMin))) {
+                    if (voteflag & (1 << (getid(p)))) {
                             votes += 1;
                     }
                 }
