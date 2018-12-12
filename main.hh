@@ -68,6 +68,7 @@ public:
     ChatDialog();
 
 private:
+    void startElectionTimer();
     Response processCommand(QString cmd, quint16 node_id);
     void getStart();
     void becomeLeader();
@@ -91,7 +92,7 @@ public slots:
 
 private:
     static const int LOG_LIMITATION = 101;
-    static const int HEARTBEATS = 1000;
+    static const int HEARTBEATS = 1500;
     static const int ELECTION_TIME = 3000;
     QTextEdit *textview;
     QLineEdit *textline;
@@ -103,7 +104,7 @@ private:
     qint16 voteflag;
     qint16 votedFor;
     Entry log[LOG_LIMITATION];
-    Entry cachedLog[LOG_LIMITATION];
+    QVector<Entry>cachedLog;
     quint16 commitIndex;
     quint16 lastApplied;
     /*  record state for all nodes: 0 close 1 follower 2 candidate 3 leader     */
