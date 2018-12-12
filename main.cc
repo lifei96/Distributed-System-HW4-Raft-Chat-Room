@@ -80,13 +80,15 @@ void ChatDialog::processCommand(Entry entry, bool redirect) {
     } else if (cmd.startsWith("DROP")) {
         int index = cmd.mid(5).toInt();
         if (index >= myPortMin && index <= myPortMax) {
+            qDebug() << "DROP" << index;
             dropIndex[index - myPortMin] = true;
         } else {
             qDebug() << "invalid node_id";
         }
     } else if (cmd.startsWith("RESTORE")) {
-        int index = cmd.mid(5).toInt();
+        int index = cmd.mid(8).toInt();
         if (index >= myPortMin && index <= myPortMax) {
+            qDebug() << "RESTORE" << index;
             dropIndex[index - myPortMin] = false;
         } else {
             qDebug() << "invalid node_id";
@@ -109,7 +111,11 @@ void ChatDialog::processCommand(Entry entry, bool redirect) {
             }
         }
     } else if (cmd.startsWith("MSG")) {
-        if (redirect) {
+        if (state == stop) {
+            qDebug() << "Cached command:" << cmd;
+            cachedLog.append(Entry(currentTerm, cmd, portNum));
+            textview->append(QString::number(entry.node_id) + "(local): " + cmd.mid(4));
+        } else if (redirect) {
             qDebug() << "Redirect command:" << cmd;
             cachedLog.append(Entry(currentTerm, cmd, portNum));
             redirectRequest();
@@ -120,23 +126,6 @@ void ChatDialog::processCommand(Entry entry, bool redirect) {
             } else {
                 textview->append(QString::number(entry.node_id) + " : " + cmd.mid(4));
             }
-
-            // if (state != leader){
-            //     // Leader also redirect to self
-            //     qDebug() << "Redirect command:" << cmd;
-            //     cachedLog.append(Entry(currentTerm, cmd, portNum));
-            //     redirectRequest();
-            // } else {
-            //     qDebug() << "Process command in leader";
-            //     log[++receiveIndex] = Entry(currentTerm, cmd, portNum);
-            //     nextIndex[portNum - myPortMin] = receiveIndex + 1;
-            //     matchIndex[portNum - myPortMin] = receiveIndex;
-            //     for (int p = myPortMin; p <= myPortMax; p++) {
-            //         if (p != portNum) {
-            //             sendRequest(msg, p, QVariantMap());
-            //         }
-            //     }
-            // }
         }
     } else {
         qDebug() << "unrecoganized message" << cmd;
@@ -399,8 +388,10 @@ void ChatDialog::deserializeMessage(QByteArray datagram, quint16 senderPort) {
     QDataStream inStream(&datagram, QIODevice::ReadOnly);
     inStream >> message;
     quint16 term;
-    if (dropIndex[senderPort - myPortMin])
+    if (dropIndex[senderPort - myPortMin]) {
+        qDebug() << "Drop message from" << senderPort;
         return;
+    }
     if (state == stop) {
         qDebug() << "Stop accept message";
         return;
@@ -436,6 +427,8 @@ void ChatDialog::deserializeMessage(QByteArray datagram, quint16 senderPort) {
         term = parameters["term"].toUInt();
 
         log[++receiveIndex] = newEntry;
+        matchIndex[portNum - myPortMin] = receiveIndex;
+        nextIndex[portNum - myPortMin] = receiveIndex + 1;
 
         QVariantMap otherinfo;
         otherinfo["cmd"] = newEntry.cmd;
