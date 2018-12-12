@@ -333,9 +333,8 @@ Response ChatDialog::appendEntries(quint16 term, quint16 leaderId, quint16 prevL
         log[i] = entries[i];
     }
     receiveIndex = prevLogIndex + size;
-    qDebug() << "TEST: lastApplied =" << lastApplied;
     for (int i = lastApplied + 1; i <= leaderCommit; i++) {
-        qDebug() << "Execute log" << i;
+        qDebug() << "Execute log:" << i;
         processCommand(log[i], false);
     }
     qDebug() << "leaderCommit =" << leaderCommit << ", receiveIndex =" << receiveIndex;
