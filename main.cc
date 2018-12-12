@@ -56,91 +56,92 @@ ChatDialog::ChatDialog() {
     connect(heartbeatTimer, SIGNAL(timeout()),
             this, SLOT(sendHeartbeat()));
 
-    lastApplied = 0;
     getStart();
-    
 }
 
 void ChatDialog::processCommand(Entry entry, bool redirect) {
     QString cmd = entry.cmd;
+    qDebug() << "Process command:" << cmd;
     // Execute cmd for other nodes
-    if (redirect == false && entry.node_id != portNum) {
-        qDebug() << "Process command for others:" << cmd;
-        if (cmd.startsWith("MSG")) {
-            textview->append(QString::number(entry.node_id) + " : " + cmd.mid(4));
-        } else if (cmd.startsWith("START")) {
-            allNodes[entry.node_id - myPortMin] = 1;
-        } else if (cmd.startsWith("STOP")) {
-            allNodes[entry.node_id - myPortMin] = 0;
-        } 
-        return;
-    }
-    // Execute cmd for self or redirect
-    if (state == stop || redirect == false) {
-        if (state == stop) {
-            qDebug() << "Process command in stop mode";
-            if (cmd.startsWith("START")) {
-                getStart();
-            } else if (cmd.startsWith("MSG")) {
-                // TODO: cache
+    if (cmd.startsWith("START")) {
+        getStart();
+    } else if (cmd.startsWith("STOP")) {
+        state = stop;
+        currentLeader = -1;
+        allNodes[portNum - myPortMin] = 0;
+        textview->append("STOP");
+        electionTimer->stop();
+    } else if (cmd.startsWith("GET_CHAT")) {
+        for (int i = 1; i <= commitIndex; i++) {
+            if (log[i].cmd.startsWith("MSG")) {
+                qDebug() << log[i].node_id << ":" << log[i].cmd.mid(4);
             }
+        }
+    } else if (cmd.startsWith("DROP")) {
+        int index = cmd.mid(5).toInt();
+        if (index >= myPortMin && index <= myPortMax) {
+            dropIndex[index - myPortMin] = true;
         } else {
-            qDebug() << "Process command after get entry from leader:" << cmd;
-            if (cmd.startsWith("MSG")) {
-                textview->append("me : " + cmd.mid(4));
-            } else if (cmd.startsWith("STOP")) {
-                state = stop;
-                textview->clear();
-            } 
+            qDebug() << "invalid node_id";
         }
-        
-        if (cmd.startsWith("GET_CHAT")) {
-            for (int i = 1; i <= commitIndex; i++) {
-                if (log[i].cmd.startsWith("MSG")) {
-                    qDebug() << log[i].node_id << " :" << log[i].cmd.mid(4);
-                }
-            }
-        } else if (cmd.startsWith("DROP")) {
-            int index = cmd.mid(5).toInt();
-            dropIndex[index] = true;
-        } else if (cmd.startsWith("RESTORE")) {
-            int index = cmd.mid(5).toInt();
-            dropIndex[index] = false;
-        } else if (cmd.startsWith("GET_NODES")) {
-            for (int p = myPortMin; p <= myPortMax; p++) {
-                switch(allNodes[p - myPortMin]) {
-                    case 0:
-                        qDebug() << p << " : stop";
-                        break;
-                    case 1:
-                        qDebug() << p << " : follower";
-                        break;
-                    case 2:
-                        qDebug() << p << " : candidate";
-                        break;
-                    case 3:
-                        qDebug() << p << " : leader";
-                        break;
-                }
-            }
+    } else if (cmd.startsWith("RESTORE")) {
+        int index = cmd.mid(5).toInt();
+        if (index >= myPortMin && index <= myPortMax) {
+            dropIndex[index - myPortMin] = false;
+        } else {
+            qDebug() << "invalid node_id";
         }
-
-    } else if (state != leader){
-        // Leader also redirect to self
-        qDebug() << "Redirect command:" << cmd;
-        cachedLog.append(Entry(currentTerm, cmd, portNum));
-        redirectRequest();
-    } else {
-        qDebug() << "Process command in leader";
-        log[++receiveIndex] = Entry(currentTerm, cmd, portNum);
-        nextIndex[portNum - myPortMin] = receiveIndex + 1;
-        matchIndex[portNum - myPortMin] = receiveIndex;
+    } else if (cmd.startsWith("GET_NODES")) {
         for (int p = myPortMin; p <= myPortMax; p++) {
-            if (p != portNum) {
-                sendRequest(msg, p, QVariantMap());
+            switch(allNodes[p - myPortMin]) {
+                case 0:
+                    qDebug() << p << ": stop";
+                    break;
+                case 1:
+                    qDebug() << p << ": follower";
+                    break;
+                case 2:
+                    qDebug() << p << ": candidate";
+                    break;
+                case 3:
+                    qDebug() << p << ": leader";
+                    break;
             }
         }
+    } else if (cmd.startsWith("MSG")) {
+        if (redirect) {
+            qDebug() << "Redirect command:" << cmd;
+            cachedLog.append(Entry(currentTerm, cmd, portNum));
+            redirectRequest();
+        } else {
+            qDebug() << "Process command for leader:" << cmd;
+            if (entry.node_id == portNum) {
+                textview->append(QString::number(entry.node_id) + "(me): " + cmd.mid(4));
+            } else {
+                textview->append(QString::number(entry.node_id) + " : " + cmd.mid(4));
+            }
+
+            // if (state != leader){
+            //     // Leader also redirect to self
+            //     qDebug() << "Redirect command:" << cmd;
+            //     cachedLog.append(Entry(currentTerm, cmd, portNum));
+            //     redirectRequest();
+            // } else {
+            //     qDebug() << "Process command in leader";
+            //     log[++receiveIndex] = Entry(currentTerm, cmd, portNum);
+            //     nextIndex[portNum - myPortMin] = receiveIndex + 1;
+            //     matchIndex[portNum - myPortMin] = receiveIndex;
+            //     for (int p = myPortMin; p <= myPortMax; p++) {
+            //         if (p != portNum) {
+            //             sendRequest(msg, p, QVariantMap());
+            //         }
+            //     }
+            // }
+        }
+    } else {
+        qDebug() << "unrecoganized message" << cmd;
     }
+
 }
 
 void ChatDialog::gotReturnPressed() {
@@ -163,14 +164,16 @@ void ChatDialog::startElectionTimer() {
     quint16 randomTimeout= qrand() % ELECTION_TIME + ELECTION_TIME;
     electionTimer->start(randomTimeout);
 }
+
 void ChatDialog::getStart() {
     state = follower;
     currentTerm = 0;
     votedFor = -1;
     commitIndex = 0;
-    // lastApplied = 0;
+    lastApplied = 0;
     currentLeader = -1;
     receiveIndex = 0;
+    textview->clear();
     for (int p = myPortMin; p <= myPortMax; p++) {
         allNodes[p - myPortMin] = 1;
         /* Set true if drop from this node  */
@@ -205,6 +208,9 @@ void ChatDialog::becomeCandidate() {
     currentLeader = -1;
     voteflag = 1 << (portNum - myPortMin);
     state = candidate;
+    for (int p = 0; p < 5; p++) {
+        allNodes[p] = 1;
+    }
     allNodes[portNum - myPortMin] = 2;
     startElectionTimer();
     for (int p = myPortMin; p <= myPortMax; p++) {
@@ -219,7 +225,7 @@ void ChatDialog::becomeLeader() {
     currentLeader = portNum;
     state = leader;
     allNodes[portNum - myPortMin] = 3;
-    electionTimer->start(0);
+    electionTimer->stop();
     sendHeartbeat();
 }
 
@@ -245,6 +251,7 @@ Response ChatDialog::requestVote(quint16 term, quint16 candidateId, quint16 last
         allNodes[candidateId - myPortMin] = 2;
         return Response(currentTerm, true);
     }
+    return Response(currentTerm, false);
 }
 
 void ChatDialog::redirectRequest() {
@@ -262,6 +269,10 @@ void ChatDialog::sendRequest(MessageType type, quint16 destPort, QVariantMap oth
     
     if (destPort < socket->myPortMin || destPort > socket->myPortMax) {
         qDebug() << "Invalid portNum:" << destPort;
+        return;
+    }
+    if (state == stop) {
+        qDebug() << "Stop send message";
         return;
     }
     QVariantMap message;
@@ -388,11 +399,13 @@ void ChatDialog::deserializeMessage(QByteArray datagram, quint16 senderPort) {
     QDataStream inStream(&datagram, QIODevice::ReadOnly);
     inStream >> message;
     quint16 term;
-    startElectionTimer();
     if (dropIndex[senderPort - myPortMin])
         return;
-    if (state == stop)
+    if (state == stop) {
+        qDebug() << "Stop accept message";
         return;
+    }
+    startElectionTimer();
     if (message.contains("ELECT")) {
         // This is follower receive requestVote RPC from candidate
         qDebug() << "Receiving elect from port:" << senderPort;
@@ -439,6 +452,8 @@ void ChatDialog::deserializeMessage(QByteArray datagram, quint16 senderPort) {
         qDebug() << "Receiving msg from port:" << senderPort;
         if (currentLeader == -1) {
             currentLeader = senderPort;
+            for(int i = 0; i < 5; i++)
+                allNodes[i] = 1;
             allNodes[senderPort - myPortMin] = 3;
         }
         QVariantMap parameters = qvariant_cast<QVariantMap>(message["MSG"]);
@@ -515,9 +530,9 @@ void ChatDialog::deserializeMessage(QByteArray datagram, quint16 senderPort) {
             // ACK for a redirected message, should check in order
             QString cmd = parameters["cmd"].toString();
             qDebug() << "redirect success for" << cmd;
-            if (!cachedLog.empty()) {
-                if (cmd == cachedLog[0].cmd)
-                    cachedLog.pop_front();
+            for (int i = 0; i < cachedLog.size(); i++) {
+                if (cmd == cachedLog[i].cmd)
+                    cachedLog.remove(i);
             }
         } else if (parameters.contains("votedFor")) {
             if (state != candidate && state != leader) {
