@@ -311,9 +311,6 @@ void ChatDialog::sendRequest(MessageType type, quint16 destPort, QVariantMap oth
             break;
             }
         case ack:
-            // for (QVariantMap::iterator iter = otherinfo.begin(); iter != otherinfo.end(); iter++) {
-            //     parameters[iter->first] = iter->second;
-            // }
             message["ACK"] = parameters;
             break;
         default:
@@ -553,11 +550,6 @@ void ChatDialog::deserializeMessage(QByteArray datagram, quint16 senderPort) {
 
         // both ACK from followers or results from leader
     }
-    // if (commitIndex > lastApplied) {
-    //     for (int i = lastApplied; i <= commitIndex; i++) {
-    //         log[i] = entries[?];
-    //     }
-    // }
     if (term > currentTerm) {
         currentTerm = term;
         state = follower;
