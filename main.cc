@@ -69,51 +69,60 @@ void ChatDialog::processCommand(Entry entry, bool redirect) {
     // Execute cmd for other nodes
     if (cmd.startsWith("START")) {
         getStart();
+        textview->append("---Started---");
     } else if (cmd.startsWith("STOP")) {
         state = stop;
         currentLeader = -1;
         allNodes[getid(portNum)] = 0;
-        textview->append("STOP");
         electionTimer->stop();
+        textview->append("---Stopped---");
     } else if (cmd.startsWith("GET_CHAT")) {
+        textview->append("---Chat History Start---");
         for (int i = 1; i <= commitIndex; i++) {
             if (log[i].cmd.startsWith("MSG")) {
-                qDebug() << log[i].node_id << ":" << log[i].cmd.mid(4);
+                textview->append(QString::number(log[i].node_id) + ":" + log[i].cmd.mid(4));
             }
         }
+        textview->append("---Chat History End---");
     } else if (cmd.startsWith("DROP")) {
         int index = cmd.mid(5).toInt();
         if (index >= myPortMin && index <= myPortMax) {
             qDebug() << "DROP" << index;
             dropIndex[getid(index)] = true;
+            textview->append("---Dropped---");
         } else {
             qDebug() << "invalid node_id";
+            textview->append("---invalid node_id---");
         }
     } else if (cmd.startsWith("RESTORE")) {
         int index = cmd.mid(8).toInt();
         if (index >= myPortMin && index <= myPortMax) {
             qDebug() << "RESTORE" << index;
             dropIndex[getid(index)] = false;
+            textview->append("---Restored---");
         } else {
             qDebug() << "invalid node_id";
+            textview->append("---invalid node_id---");
         }
     } else if (cmd.startsWith("GET_NODES")) {
+        textview->append("---Raft State Start---");
         for (int p = myPortMin; p <= myPortMax; p++) {
             switch(allNodes[getid(p)]) {
                 case 0:
-                    qDebug() << p << ": stop";
+                    textview->append(QString::number(p) + ": stop");
                     break;
                 case 1:
-                    qDebug() << p << ": follower";
+                    textview->append(QString::number(p) + ": follower");
                     break;
                 case 2:
-                    qDebug() << p << ": candidate";
+                    textview->append(QString::number(p) + ": candidate");
                     break;
                 case 3:
-                    qDebug() << p << ": leader";
+                    textview->append(QString::number(p) + ": leader");
                     break;
             }
         }
+        textview->append("---Raft State End---");
     } else if (cmd.startsWith("MSG")) {
         if (state == stop) {
             qDebug() << "Cached command:" << cmd;
@@ -133,6 +142,7 @@ void ChatDialog::processCommand(Entry entry, bool redirect) {
         }
     } else {
         qDebug() << "unrecoganized message" << cmd;
+        textview->append("---Invalid cmd received---");
     }
 
 }
