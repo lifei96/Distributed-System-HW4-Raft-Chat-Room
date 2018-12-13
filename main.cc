@@ -77,7 +77,7 @@ void ChatDialog::processCommand(Entry entry, bool redirect) {
         electionTimer->stop();
         textview->append("---Stopped---");
     } else if (cmd.startsWith("GET_CHAT")) {
-        textview->append("---Chat History Start---");
+        textview->append("---Chat History Begin---");
         for (int i = 1; i <= commitIndex; i++) {
             if (log[i].cmd.startsWith("MSG")) {
                 textview->append(QString::number(log[i].node_id) + ":" + log[i].cmd.mid(4));
@@ -105,7 +105,7 @@ void ChatDialog::processCommand(Entry entry, bool redirect) {
             textview->append("---invalid node_id---");
         }
     } else if (cmd.startsWith("GET_NODES")) {
-        textview->append("---Raft State Start---");
+        textview->append("---Raft State Begin---");
         for (int p = myPortMin; p <= myPortMax; p++) {
             switch(allNodes[getid(p)]) {
                 case 0:
