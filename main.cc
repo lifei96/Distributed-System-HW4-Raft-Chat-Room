@@ -459,6 +459,9 @@ void ChatDialog::deserializeMessage(QByteArray datagram, quint16 senderPort) {
                 allNodes[i] = 1;
             allNodes[getid(senderPort)] = 3;
         }
+        if (state != follower) {
+            becomeFollower();
+        }
         QVariantMap parameters = qvariant_cast<QVariantMap>(message["MSG"]);
         term = parameters["term"].toUInt();
         quint16 leaderId = parameters["leaderId"].toUInt();
@@ -562,7 +565,7 @@ void ChatDialog::deserializeMessage(QByteArray datagram, quint16 senderPort) {
     }
     if (term > currentTerm) {
         currentTerm = term;
-        state = follower;
+        becomeFollower();
     }
 }
 
